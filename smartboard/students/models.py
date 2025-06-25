@@ -1,5 +1,6 @@
+# students/models.py
 from django.db import models
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, EmailValidator
 
 class Student(models.Model):
     BRANCH_CHOICES = [
@@ -14,6 +15,7 @@ class Student(models.Model):
     ]
     
     name = models.CharField(max_length=100)
+    
     roll_number = models.CharField(
         max_length=20, 
         unique=True,
@@ -22,6 +24,7 @@ class Student(models.Model):
             message='Roll number must be alphanumeric'
         )]
     )
+    
     phone_number = models.CharField(
         max_length=15,
         validators=[RegexValidator(
@@ -29,6 +32,15 @@ class Student(models.Model):
             message='Phone number must be 9-15 digits'
         )]
     )
+    
+    gmail_address = models.EmailField(
+        max_length=254,
+        validators=[EmailValidator()],
+        help_text="Student's Gmail address for exam notifications",
+        null=True,
+        blank=True
+    )
+    
     branch = models.CharField(max_length=10, choices=BRANCH_CHOICES)
     exam_hall_number = models.CharField(max_length=20)
     email_sent = models.BooleanField(default=False)
@@ -45,4 +57,8 @@ class Student(models.Model):
     
     @property
     def email_address(self):
+        return self.gmail_address
+    
+    @property
+    def institutional_email(self):
         return f"{self.roll_number.lower()}@mits.ac.in"

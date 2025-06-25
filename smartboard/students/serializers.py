@@ -1,17 +1,19 @@
+# students/serializers.py
 from rest_framework import serializers
 from .models import Student
 import pandas as pd
-import openpyxl
 
 class StudentSerializer(serializers.ModelSerializer):
     email_address = serializers.ReadOnlyField()
+    institutional_email = serializers.ReadOnlyField()
     
     class Meta:
         model = Student
         fields = [
             'id', 'name', 'roll_number', 'phone_number', 
-            'branch', 'exam_hall_number', 'email_sent', 
-            'email_address', 'created_at', 'updated_at'
+            'gmail_address', 'branch', 'exam_hall_number', 
+            'email_sent', 'email_address', 'institutional_email',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'email_sent', 'created_at', 'updated_at']
 
@@ -20,8 +22,16 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'name', 'roll_number', 'phone_number', 
-            'branch', 'exam_hall_number'
+            'gmail_address', 'branch', 'exam_hall_number'
         ]
+    
+    def validate_gmail_address(self, value):
+        """Validate that the email is a Gmail address"""
+        if not value.lower().endswith('@gmail.com'):
+            raise serializers.ValidationError(
+                "Please provide a valid Gmail address ending with @gmail.com"
+            )
+        return value.lower()
 
 class FileUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
@@ -45,7 +55,7 @@ class FileUploadSerializer(serializers.Serializer):
                 df = pd.read_excel(file)
             
             # Validate required columns
-            required_columns = ['name', 'roll_number', 'phone_number', 'branch', 'exam_hall_number']
+            required_columns = ['name', 'roll_number', 'phone_number', 'gmail_address', 'branch', 'exam_hall_number']
             missing_columns = [col for col in required_columns if col not in df.columns]
             
             if missing_columns:
@@ -64,6 +74,7 @@ class FileUploadSerializer(serializers.Serializer):
                         'name': str(row['name']).strip(),
                         'roll_number': str(row['roll_number']).strip().upper(),
                         'phone_number': str(row['phone_number']).strip(),
+                        'gmail_address': str(row['gmail_address']).strip().lower(),
                         'branch': str(row['branch']).strip().upper(),
                         'exam_hall_number': str(row['exam_hall_number']).strip(),
                     }

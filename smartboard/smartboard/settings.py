@@ -1,5 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
+from decouple import config
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -151,3 +153,25 @@ SIMPLE_JWT = {
 # EMAIL_HOST_PASSWORD = ''  # Replace with the Outlook App Password
 
 # DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+
+# settings.py - Add these Gmail SMTP settings
+
+# Email Configuration for Gmail
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = config('GMAIL_USER')
+EMAIL_HOST_PASSWORD = config('GMAIL_APP_PASSWORD')
+DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
+
+
+# Alternative for production - use environment variables
+# import os
+# EMAIL_HOST_USER = os.environ.get('GMAIL_USER', 'your-email@gmail.com')
+# EMAIL_HOST_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'your-app-password')
+# DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'your-email@gmail.com')
+
+# For development, you can also use console backend to test
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
