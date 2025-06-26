@@ -14,6 +14,26 @@ class Student(models.Model):
         ('CSBS', 'Computer Science and Business Systems'),
     ]
     
+    YEAR_CHOICES = [
+        ('1', '1st Year'),
+        ('2', '2nd Year'),
+        ('3', '3rd Year'),
+        ('4', '4th Year'),
+    ]
+    
+    SECTION_CHOICES = [
+        ('A', 'Section A'),
+        ('B', 'Section B'),
+        ('C', 'Section C'),
+        ('D', 'Section D'),
+        ('E', 'Section E'),
+        ('F', 'Section F'),
+        ('G', 'Section G'),
+        ('H', 'Section H'),
+        ('I', 'Section I'),
+        ('J', 'Section J'),
+    ]
+    
     name = models.CharField(max_length=100)
     
     roll_number = models.CharField(
@@ -42,18 +62,21 @@ class Student(models.Model):
     )
     
     branch = models.CharField(max_length=10, choices=BRANCH_CHOICES)
+    year = models.CharField(max_length=1, choices=YEAR_CHOICES, default='1')  # Added default
+    section = models.CharField(max_length=1, choices=SECTION_CHOICES, default='A')  # Added default
     exam_hall_number = models.CharField(max_length=20)
     email_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['roll_number']
+        ordering = ['branch', 'year', 'section', 'roll_number']
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
+        unique_together = ['branch', 'year', 'section', 'roll_number']
     
     def __str__(self):
-        return f"{self.roll_number} - {self.name}"
+        return f"{self.roll_number} - {self.name} ({self.branch} {self.year}-{self.section})"
     
     @property
     def email_address(self):
@@ -62,3 +85,7 @@ class Student(models.Model):
     @property
     def institutional_email(self):
         return f"{self.roll_number.lower()}@mits.ac.in"
+    
+    @property
+    def full_class_info(self):
+        return f"{self.get_branch_display()} - {self.get_year_display()} - {self.get_section_display()}"

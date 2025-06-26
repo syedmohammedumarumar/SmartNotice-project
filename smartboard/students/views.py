@@ -6,6 +6,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Count, Q
 from .models import Student
 from .serializers import (
     StudentSerializer, StudentCreateSerializer, 
@@ -30,6 +31,8 @@ class StudentListCreateView(generics.ListCreateAPIView):
         queryset = Student.objects.all()
         roll_number = self.request.query_params.get('roll_number')
         branch = self.request.query_params.get('branch')
+        year = self.request.query_params.get('year')
+        section = self.request.query_params.get('section')
         hall_number = self.request.query_params.get('hall_number')
         gmail = self.request.query_params.get('gmail')
         
@@ -37,6 +40,10 @@ class StudentListCreateView(generics.ListCreateAPIView):
             queryset = queryset.filter(roll_number__icontains=roll_number)
         if branch:
             queryset = queryset.filter(branch=branch)
+        if year:
+            queryset = queryset.filter(year=year)
+        if section:
+            queryset = queryset.filter(section=section)
         if hall_number:
             queryset = queryset.filter(exam_hall_number=hall_number)
         if gmail:
@@ -49,6 +56,183 @@ class StudentDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Student.objects.all()
     serializer_class = StudentSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_branches(request):
+    """Get all available branches"""
+    branches = Student.objects.values('branch').annotate(
+        student_count=Count('id')
+    ).order_by('branch')
+    
+    branch_data = []
+    for branch in branches:
+        branch_info = {
+            'code': branch['branch'],
+            'name': dict(Student.BRANCH_CHOICES)[branch['branch']],
+            'student_count': branch['student_count']
+        }
+        branch_data.append(branch_info)
+    
+    return Response({
+        'branches': branch_data,
+        'total_branches': len(branch_data)
+    })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_years_by_branch(request, branch_code):
+    """Get all available years for a specific branch"""
+    years = Student.objects.filter(branch=branch_code).values('year').annotate(
+        student_count=Count('id')
+    ).order_by('year')
+    
+    if not years:
+        return Response({
+            'error': f'No students found for branch {branch_code}'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    year_data = []
+    for year in years:
+        year_info = {
+            'code': year['year'],
+            'name': dict(Student.YEAR_CHOICES)[year['year']],
+            'student_count': year['student_count']
+        }
+        year_data.append(year_info)
+    
+    return Response({
+        'branch': {
+            'code': branch_code,
+            'name': dict(Student.BRANCH_CHOICES)[branch_code]
+        },
+        'years': year_data,
+        'total_years': len(year_data)
+    })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_sections_by_branch_year(request, branch_code, year):
+    """Get all available sections for a specific branch and year"""
+    sections = Student.objects.filter(
+        branch=branch_code, 
+        year=year
+    ).values('section').annotate(
+        student_count=Count('id')
+    ).order_by('section')
+    
+    if not sections:
+        return Response({
+            'error': f'No students found for {branch_code} {year} year'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    section_data = []
+    for section in sections:
+        section_info = {
+            'code': section['section'],
+            'name': dict(Student.SECTION_CHOICES)[section['section']],
+            'student_count': section['student_count']
+        }
+        section_data.append(section_info)
+    
+    return Response({
+        'branch': {
+            'code': branch_code,
+            'name': dict(Student.BRANCH_CHOICES)[branch_code]
+        },
+        'year': {
+            'code': year,
+            'name': dict(Student.YEAR_CHOICES)[year]
+        },
+        'sections': section_data,
+        'total_sections': len(section_data)
+    })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_students_by_branch_year_section(request, branch_code, year, section):
+    """Get all students for a specific branch, year, and section"""
+    students = Student.objects.filter(
+        branch=branch_code,
+        year=year,
+        section=section
+    ).order_by('roll_number')
+    
+    if not students.exists():
+        return Response({
+            'error': f'No students found for {branch_code} {year} year Section {section}'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = StudentSerializer(students, many=True)
+    
+    return Response({
+        'branch': {
+            'code': branch_code,
+            'name': dict(Student.BRANCH_CHOICES)[branch_code]
+        },
+        'year': {
+            'code': year,
+            'name': dict(Student.YEAR_CHOICES)[year]
+        },
+        'section': {
+            'code': section,
+            'name': dict(Student.SECTION_CHOICES)[section]
+        },
+        'students': serializer.data,
+        'total_students': len(serializer.data)
+    })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_hierarchy_overview(request):
+    """Get complete hierarchy overview (Branch → Year → Section counts)"""
+    hierarchy = {}
+    
+    # Get all combinations of branch, year, section with student counts
+    combinations = Student.objects.values('branch', 'year', 'section').annotate(
+        student_count=Count('id')
+    ).order_by('branch', 'year', 'section')
+    
+    for combo in combinations:
+        branch_code = combo['branch']
+        year_code = combo['year']
+        section_code = combo['section']
+        count = combo['student_count']
+        
+        # Initialize branch if not exists
+        if branch_code not in hierarchy:
+            hierarchy[branch_code] = {
+                'name': dict(Student.BRANCH_CHOICES)[branch_code],
+                'years': {},
+                'total_students': 0
+            }
+        
+        # Initialize year if not exists
+        if year_code not in hierarchy[branch_code]['years']:
+            hierarchy[branch_code]['years'][year_code] = {
+                'name': dict(Student.YEAR_CHOICES)[year_code],
+                'sections': {},
+                'total_students': 0
+            }
+        
+        # Add section data
+        hierarchy[branch_code]['years'][year_code]['sections'][section_code] = {
+            'name': dict(Student.SECTION_CHOICES)[section_code],
+            'student_count': count
+        }
+        
+        # Update totals
+        hierarchy[branch_code]['years'][year_code]['total_students'] += count
+        hierarchy[branch_code]['total_students'] += count
+    
+    return Response({
+        'hierarchy': hierarchy,
+        'total_students': Student.objects.count(),
+        'total_branches': len(hierarchy)
+    })
+
+# Keep all your existing views (upload_students_file, send_individual_email, etc.)
+# Just add the year and section fields to the file processing logic
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -152,7 +336,7 @@ def send_exam_room_email(student):
     try:
         subject = f'Exam Room Allocation - {student.roll_number} | MITS'
         
-        # Enhanced email template
+        # Enhanced email template with year and section info
         message = f"""
 Dear {student.name},
 
@@ -163,6 +347,8 @@ Your exam room has been allocated for the upcoming examination.
 👤 Name: {student.name}
 🎓 Roll Number: {student.roll_number}
 🏛️ Branch: {student.get_branch_display()}
+📅 Year: {student.get_year_display()}
+📖 Section: {student.get_section_display()}
 🏢 Exam Hall Number: {student.exam_hall_number}
 📧 Contact Email: {student.gmail_address}
 
@@ -239,20 +425,46 @@ def send_bulk_emails(students):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_statistics(request):
-    """Get system statistics"""
+    """Get system statistics with hierarchical breakdown"""
     total_students = Student.objects.count()
     emails_sent = Student.objects.filter(email_sent=True).count()
     students_with_gmail = Student.objects.exclude(gmail_address='').count()
-    branches_stats = {}
     
+    # Branch-wise statistics
+    branches_stats = {}
     for branch_code, branch_name in Student.BRANCH_CHOICES:
-        count = Student.objects.filter(branch=branch_code).count()
+        branch_students = Student.objects.filter(branch=branch_code)
+        count = branch_students.count()
         if count > 0:
             branches_stats[branch_code] = {
                 'name': branch_name,
                 'count': count,
-                'emails_sent': Student.objects.filter(branch=branch_code, email_sent=True).count()
+                'emails_sent': branch_students.filter(email_sent=True).count(),
+                'years': {}
             }
+            
+            # Year-wise breakdown for each branch
+            for year_code, year_name in Student.YEAR_CHOICES:
+                year_students = branch_students.filter(year=year_code)
+                year_count = year_students.count()
+                if year_count > 0:
+                    branches_stats[branch_code]['years'][year_code] = {
+                        'name': year_name,
+                        'count': year_count,
+                        'emails_sent': year_students.filter(email_sent=True).count(),
+                        'sections': {}
+                    }
+                    
+                    # Section-wise breakdown for each year
+                    for section_code, section_name in Student.SECTION_CHOICES:
+                        section_students = year_students.filter(section=section_code)
+                        section_count = section_students.count()
+                        if section_count > 0:
+                            branches_stats[branch_code]['years'][year_code]['sections'][section_code] = {
+                                'name': section_name,
+                                'count': section_count,
+                                'emails_sent': section_students.filter(email_sent=True).count()
+                            }
     
     return Response({
         'total_students': total_students,
