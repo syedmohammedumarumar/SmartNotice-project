@@ -4,15 +4,17 @@ from django.core.validators import RegexValidator, EmailValidator
 
 class Student(models.Model):
     BRANCH_CHOICES = [
-        ('CSE', 'Computer Science Engineering'),
-        ('ECE', 'Electronics and Communication Engineering'),
-        ('ME', 'Mechanical Engineering'),
-        ('CE', 'Civil Engineering'),
-        ('EEE', 'Electrical and Electronics Engineering'),
-        ('IT', 'Information Technology'),
-        ('AIML', 'Artificial Intelligence and Machine Learning'),
-        ('CSBS', 'Computer Science and Business Systems'),
+        ('CSE', 'Computer Science & Engineering (CSE)'),
+        ('CSM', 'Computer Science & Engineering - AI & ML (CSM)'),
+        ('CAI', 'Computer Science & Engineering - Artificial Intelligence (CAI)'),
+        ('CSD', 'Computer Science & Engineering - Data Science (CSD)'),
+        ('CSC', 'Computer Science & Engineering - Cyber Security (CSC)'),
+        ('ECE', 'Electronics and Communication Engineering (ECE)'),
+        ('EEE', 'Electrical and Electronics Engineering (EEE)'),
+        ('MEC', 'Mechanical Engineering (MEC)'),
+        ('CIV', 'Civil Engineering (CIV)'),
     ]
+
     
     YEAR_CHOICES = [
         ('1', '1st Year'),
