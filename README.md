@@ -475,22 +475,216 @@ const response = await fetch('/api/students/test-email/', {
 
 ---
 
-## 📊 Statistics
+# 📊 Statistics API Backend Documentation
+
+## Endpoint Overview
 
 ### Get System Statistics
-```javascript
-// GET /api/students/statistics/
-const response = await fetch('/api/students/statistics/');
+```http
+GET /api/students/statistics/
 ```
 
-**Response includes:**
-- Total students count
-- Email delivery statistics
-- Branch-wise breakdown
-- Year and section wise counts
-- Perfect for dashboard widgets!
+**Base URL:** `http://127.0.0.1:8000`
 
----
+**Full URL:** `http://127.0.0.1:8000/api/students/statistics/`
+
+**Method:** `GET`
+
+**Content-Type:** `application/json`
+
+## Response Structure
+
+### Root Level Schema
+```json
+{
+    "total_students": Integer,
+    "students_with_gmail": Integer,
+    "emails_sent": Integer,
+    "emails_pending": Integer,
+    "branches_statistics": Object
+}
+```
+
+### Branch Statistics Schema
+```json
+"branches_statistics": {
+    "BRANCH_CODE": {
+        "name": String,
+        "count": Integer,
+        "emails_sent": Integer,
+        "years": Object
+    }
+}
+```
+
+### Year Statistics Schema
+```json
+"years": {
+    "YEAR_NUMBER": {
+        "name": String,
+        "count": Integer,
+        "emails_sent": Integer,
+        "sections": Object
+    }
+}
+```
+
+### Section Statistics Schema
+```json
+"sections": {
+    "SECTION_CODE": {
+        "name": String,
+        "count": Integer,
+        "emails_sent": Integer
+    }
+}
+```
+
+## Complete Response Example
+
+```json
+{
+    "total_students": 53,
+    "students_with_gmail": 53,
+    "emails_sent": 18,
+    "emails_pending": 35,
+    "branches_statistics": {
+        "CSE": {
+            "name": "Computer Science & Engineering (CSE)",
+            "count": 47,
+            "emails_sent": 13,
+            "years": {
+                "1": {
+                    "name": "1st Year",
+                    "count": 47,
+                    "emails_sent": 13,
+                    "sections": {
+                        "A": {
+                            "name": "Section A",
+                            "count": 47,
+                            "emails_sent": 13
+                        }
+                    }
+                }
+            }
+        },
+        "ECE": {
+            "name": "Electronics and Communication Engineering (ECE)",
+            "count": 3,
+            "emails_sent": 3,
+            "years": {
+                "1": {
+                    "name": "1st Year",
+                    "count": 3,
+                    "emails_sent": 3,
+                    "sections": {
+                        "A": {
+                            "name": "Section A",
+                            "count": 3,
+                            "emails_sent": 3
+                        }
+                    }
+                }
+            }
+        },
+        "EEE": {
+            "name": "Electrical and Electronics Engineering (EEE)",
+            "count": 2,
+            "emails_sent": 2,
+            "years": {
+                "1": {
+                    "name": "1st Year",
+                    "count": 2,
+                    "emails_sent": 2,
+                    "sections": {
+                        "A": {
+                            "name": "Section A",
+                            "count": 2,
+                            "emails_sent": 2
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+## Field Descriptions
+
+### Root Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_students` | Integer | Total count of all students in the system |
+| `students_with_gmail` | Integer | Number of students who have Gmail email addresses |
+| `emails_sent` | Integer | Total number of emails that have been successfully sent |
+| `emails_pending` | Integer | Number of emails queued/waiting to be sent |
+| `branches_statistics` | Object | Hierarchical breakdown by academic branches |
+
+### Branch Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | String | Full descriptive name of the academic branch/department |
+| `count` | Integer | Total number of students enrolled in this branch |
+| `emails_sent` | Integer | Number of emails sent to students in this branch |
+| `years` | Object | Year-wise breakdown within this branch |
+
+### Year Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | String | Display name for the academic year (e.g., "1st Year", "2nd Year") |
+| `count` | Integer | Number of students in this year within the branch |
+| `emails_sent` | Integer | Emails sent to students in this specific year |
+| `sections` | Object | Section-wise breakdown within this year |
+
+### Section Level Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | String | Section identifier with descriptive text (e.g., "Section A") |
+| `count` | Integer | Number of students in this specific section |
+| `emails_sent` | Integer | Emails sent to students in this section |
+
+## Data Hierarchy
+
+```
+Root
+├── total_students (Integer)
+├── students_with_gmail (Integer)  
+├── emails_sent (Integer)
+├── emails_pending (Integer)
+└── branches_statistics (Object)
+    └── [BRANCH_CODE] (Object)
+        ├── name (String)
+        ├── count (Integer)
+        ├── emails_sent (Integer)
+        └── years (Object)
+            └── [YEAR_NUMBER] (Object)
+                ├── name (String)
+                ├── count (Integer)
+                ├── emails_sent (Integer)
+                └── sections (Object)
+                    └── [SECTION_CODE] (Object)
+                        ├── name (String)
+                        ├── count (Integer)
+                        └── emails_sent (Integer)
+```
+
+## HTTP Status Codes
+
+| Status Code | Description |
+|-------------|-------------|
+| `200 OK` | Request successful, statistics data returned |
+| `401 Unauthorized` | Authentication credentials missing or invalid |
+| `403 Forbidden` | Insufficient permissions to access statistics |
+| `500 Internal Server Error` | Server-side error occurred |
+
+## Authentication Requirements
+
+This endpoint requires authentication. Ensure proper authentication headers are included in the request.
 
 ## 🚨 Error Handling
 
