@@ -12,7 +12,8 @@ SECRET_KEY = 'umarmohammed47'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# IMPORTANT: Add your frontend URL to allowed hosts
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 # Application definition
 INSTALLED_APPS = [
@@ -27,6 +28,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',  # Add CORS headers
     
     # Local apps
     'authentication',
@@ -34,6 +36,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Add this at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -144,18 +147,37 @@ SIMPLE_JWT = {
     'JTI_CLAIM': 'jti',
 }
 
-# Email Configuration (Outlook SMTP)
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.office365.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'mdumermdsyed747@outlook.com'  # Replace with your official exam cell email
-# EMAIL_HOST_PASSWORD = ''  # Replace with the Outlook App Password
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # React development server
+    "http://127.0.0.1:3000",
+]
 
-# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# For development only - remove in production
+CORS_ALLOW_ALL_ORIGINS = True  # Remove this in production
 
+CORS_ALLOW_CREDENTIALS = True
 
-# settings.py - Add these Gmail SMTP settings
+CORS_ALLOWED_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # Email Configuration for Gmail
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -165,13 +187,6 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = config('GMAIL_USER')
 EMAIL_HOST_PASSWORD = config('GMAIL_APP_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
-
-
-# Alternative for production - use environment variables
-# import os
-# EMAIL_HOST_USER = os.environ.get('GMAIL_USER', 'your-email@gmail.com')
-# EMAIL_HOST_PASSWORD = os.environ.get('GMAIL_APP_PASSWORD', 'your-app-password')
-# DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'your-email@gmail.com')
 
 # For development, you can also use console backend to test
 # EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'

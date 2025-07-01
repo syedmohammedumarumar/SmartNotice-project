@@ -1,3 +1,4 @@
+# authentication/urls.py
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
@@ -14,4 +15,9 @@ urlpatterns = [
     path('profile/update/', views.update_profile, name='update_profile'),
     path('change-password/', views.change_password, name='change_password'),
     path('verify-token/', views.verify_token, name='verify_token'),
+    
+    # OTP-based Password reset endpoints
+    path('forgot-password/', views.forgot_password, name='forgot_password'),
+    path('verify-otp/', views.verify_otp, name='verify_otp'),
+    path('reset-password/', views.reset_password, name='reset_password'),
 ]

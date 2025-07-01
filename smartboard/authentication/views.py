@@ -1,3 +1,4 @@
+# authentication/views.py
 from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
@@ -10,7 +11,10 @@ from .serializers import (
     UserRegistrationSerializer, 
     UserLoginSerializer, 
     UserSerializer,
-    ChangePasswordSerializer
+    ChangePasswordSerializer,
+    ForgotPasswordSerializer,
+    VerifyOTPSerializer,
+    ResetPasswordSerializer
 )
 
 
@@ -128,3 +132,58 @@ def verify_token(request):
         'message': 'Token is valid',
         'user': UserSerializer(request.user).data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def forgot_password(request):
+    """Send OTP for password reset"""
+    serializer = ForgotPasswordSerializer(data=request.data)
+    if serializer.is_valid():
+        try:
+            serializer.save()
+            return Response({
+                'message': 'OTP sent successfully to your email. Please check your email and enter the 6-digit code.'
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({
+                'message': 'Failed to send OTP email',
+                'error': str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    """Verify OTP for password reset"""
+    serializer = VerifyOTPSerializer(data=request.data)
+    if serializer.is_valid():
+        return Response({
+            'message': 'OTP verified successfully. You can now reset your password.',
+            'email': serializer.validated_data['email'],
+            'otp_verified': True
+        }, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def reset_password(request):
+    """Reset password using OTP"""
+    serializer = ResetPasswordSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        
+        # Generate new tokens for the user
+        refresh = RefreshToken.for_user(user)
+        
+        return Response({
+            'message': 'Password reset successfully',
+            'user': UserSerializer(user).data,
+            'tokens': {
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+            }
+        }, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
