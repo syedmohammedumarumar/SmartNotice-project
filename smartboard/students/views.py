@@ -10,7 +10,7 @@ from django.db.models import Count, Q
 from .models import Student
 from .serializers import (
     StudentSerializer, StudentCreateSerializer, 
-    FileUploadSerializer, BulkEmailSerializer
+    ExamRoomUploadSerializer, BulkEmailSerializer
 )
 import logging
 import time
@@ -32,7 +32,6 @@ class StudentListCreateView(generics.ListCreateAPIView):
         roll_number = self.request.query_params.get('roll_number')
         branch = self.request.query_params.get('branch')
         year = self.request.query_params.get('year')
-        section = self.request.query_params.get('section')
         hall_number = self.request.query_params.get('hall_number')
         gmail = self.request.query_params.get('gmail')
         
@@ -42,8 +41,6 @@ class StudentListCreateView(generics.ListCreateAPIView):
             queryset = queryset.filter(branch=branch)
         if year:
             queryset = queryset.filter(year=year)
-        if section:
-            queryset = queryset.filter(section=section)
         if hall_number:
             queryset = queryset.filter(exam_hall_number=hall_number)
         if gmail:
@@ -112,55 +109,16 @@ def get_years_by_branch(request, branch_code):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
-def get_sections_by_branch_year(request, branch_code, year):
-    """Get all available sections for a specific branch and year"""
-    sections = Student.objects.filter(
-        branch=branch_code, 
-        year=year
-    ).values('section').annotate(
-        student_count=Count('id')
-    ).order_by('section')
-    
-    if not sections:
-        return Response({
-            'error': f'No students found for {branch_code} {year} year'
-        }, status=status.HTTP_404_NOT_FOUND)
-    
-    section_data = []
-    for section in sections:
-        section_info = {
-            'code': section['section'],
-            'name': dict(Student.SECTION_CHOICES)[section['section']],
-            'student_count': section['student_count']
-        }
-        section_data.append(section_info)
-    
-    return Response({
-        'branch': {
-            'code': branch_code,
-            'name': dict(Student.BRANCH_CHOICES)[branch_code]
-        },
-        'year': {
-            'code': year,
-            'name': dict(Student.YEAR_CHOICES)[year]
-        },
-        'sections': section_data,
-        'total_sections': len(section_data)
-    })
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def get_students_by_branch_year_section(request, branch_code, year, section):
-    """Get all students for a specific branch, year, and section"""
+def get_students_by_branch_year(request, branch_code, year):
+    """Get all students for a specific branch and year"""
     students = Student.objects.filter(
         branch=branch_code,
-        year=year,
-        section=section
+        year=year
     ).order_by('roll_number')
     
     if not students.exists():
         return Response({
-            'error': f'No students found for {branch_code} {year} year Section {section}'
+            'error': f'No students found for {branch_code} {year} year'
         }, status=status.HTTP_404_NOT_FOUND)
     
     serializer = StudentSerializer(students, many=True)
@@ -174,10 +132,6 @@ def get_students_by_branch_year_section(request, branch_code, year, section):
             'code': year,
             'name': dict(Student.YEAR_CHOICES)[year]
         },
-        'section': {
-            'code': section,
-            'name': dict(Student.SECTION_CHOICES)[section]
-        },
         'students': serializer.data,
         'total_students': len(serializer.data)
     })
@@ -185,18 +139,17 @@ def get_students_by_branch_year_section(request, branch_code, year, section):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_hierarchy_overview(request):
-    """Get complete hierarchy overview (Branch → Year → Section counts)"""
+    """Get complete hierarchy overview (Branch → Year counts)"""
     hierarchy = {}
     
-    # Get all combinations of branch, year, section with student counts
-    combinations = Student.objects.values('branch', 'year', 'section').annotate(
+    # Get all combinations of branch, year with student counts
+    combinations = Student.objects.values('branch', 'year').annotate(
         student_count=Count('id')
-    ).order_by('branch', 'year', 'section')
+    ).order_by('branch', 'year')
     
     for combo in combinations:
         branch_code = combo['branch']
         year_code = combo['year']
-        section_code = combo['section']
         count = combo['student_count']
         
         # Initialize branch if not exists
@@ -207,22 +160,13 @@ def get_hierarchy_overview(request):
                 'total_students': 0
             }
         
-        # Initialize year if not exists
-        if year_code not in hierarchy[branch_code]['years']:
-            hierarchy[branch_code]['years'][year_code] = {
-                'name': dict(Student.YEAR_CHOICES)[year_code],
-                'sections': {},
-                'total_students': 0
-            }
-        
-        # Add section data
-        hierarchy[branch_code]['years'][year_code]['sections'][section_code] = {
-            'name': dict(Student.SECTION_CHOICES)[section_code],
+        # Add year data
+        hierarchy[branch_code]['years'][year_code] = {
+            'name': dict(Student.YEAR_CHOICES)[year_code],
             'student_count': count
         }
         
         # Update totals
-        hierarchy[branch_code]['years'][year_code]['total_students'] += count
         hierarchy[branch_code]['total_students'] += count
     
     return Response({
@@ -231,14 +175,11 @@ def get_hierarchy_overview(request):
         'total_branches': len(hierarchy)
     })
 
-# Keep all your existing views (upload_students_file, send_individual_email, etc.)
-# Just add the year and section fields to the file processing logic
-
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
-def upload_students_file(request):
-    """Upload Excel/CSV file and create student records"""
-    serializer = FileUploadSerializer(data=request.data)
+def upload_exam_room_file(request):
+    """Upload Excel/CSV file with exam room allocations and send emails"""
+    serializer = ExamRoomUploadSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -246,42 +187,48 @@ def upload_students_file(request):
     send_emails = serializer.validated_data['send_emails']
     
     try:
-        # Process file
-        students_data = serializer.process_file(file, send_emails)
+        # Process file to get roll numbers and room numbers
+        exam_data = serializer.process_file(file, send_emails)
         
-        created_students = []
         updated_students = []
+        not_found_students = []
         email_results = []
         
         with transaction.atomic():
-            for student_data in students_data:
-                student, created = Student.objects.update_or_create(
-                    roll_number=student_data['roll_number'],
-                    defaults=student_data
-                )
+            for data in exam_data:
+                roll_number = data['roll_number']
+                room_number = data['room_number']
                 
-                if created:
-                    created_students.append(student)
-                else:
+                try:
+                    # Find student by roll number
+                    student = Student.objects.get(roll_number=roll_number)
+                    
+                    # Update exam hall number
+                    student.exam_hall_number = room_number
+                    student.save(update_fields=['exam_hall_number'])
+                    
                     updated_students.append(student)
+                    
+                except Student.DoesNotExist:
+                    not_found_students.append(roll_number)
         
         # Send emails if requested
-        if send_emails:
-            all_students = created_students + updated_students
-            email_results = send_bulk_emails(all_students)
+        if send_emails and updated_students:
+            email_results = send_bulk_emails(updated_students)
         
         return Response({
-            'message': 'File processed successfully',
-            'created_count': len(created_students),
+            'message': 'Exam room file processed successfully',
             'updated_count': len(updated_students),
-            'total_processed': len(students_data),
+            'not_found_count': len(not_found_students),
+            'not_found_roll_numbers': not_found_students,
+            'total_processed': len(exam_data),
             'emails_sent': len([r for r in email_results if r['success']]) if send_emails else 0,
             'email_failures': len([r for r in email_results if not r['success']]) if send_emails else 0,
             'email_results': email_results if send_emails else []
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
         
     except Exception as e:
-        logger.error(f"Error processing file upload: {str(e)}")
+        logger.error(f"Error processing exam room file: {str(e)}")
         return Response({
             'error': 'Failed to process file',
             'detail': str(e)
@@ -293,6 +240,19 @@ def send_individual_email(request, student_id):
     """Send email to individual student's Gmail"""
     try:
         student = Student.objects.get(id=student_id)
+        
+        # Check if student has Gmail address
+        if not student.gmail_address:
+            return Response({
+                'error': 'Student does not have a Gmail address'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Check if student has exam hall number
+        if not student.exam_hall_number:
+            return Response({
+                'error': 'Student does not have an exam hall number assigned'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         result = send_exam_room_email(student)
         
         if result['success']:
@@ -321,11 +281,21 @@ def send_bulk_emails_view(request):
     student_ids = serializer.validated_data['student_ids']
     students = Student.objects.filter(id__in=student_ids)
     
-    email_results = send_bulk_emails(students)
+    # Filter students who have Gmail addresses and exam hall numbers
+    valid_students = students.filter(
+        gmail_address__isnull=False,
+        exam_hall_number__isnull=False
+    ).exclude(
+        gmail_address='',
+        exam_hall_number=''
+    )
+    
+    email_results = send_bulk_emails(valid_students)
     
     return Response({
         'message': 'Bulk email sending completed',
         'total_students': len(students),
+        'valid_students': len(valid_students),
         'emails_sent': len([r for r in email_results if r['success']]),
         'email_failures': len([r for r in email_results if not r['success']]),
         'results': email_results
@@ -334,9 +304,27 @@ def send_bulk_emails_view(request):
 def send_exam_room_email(student):
     """Send exam room allocation email to student's Gmail"""
     try:
+        if not student.gmail_address:
+            return {
+                'success': False,
+                'student_id': student.id,
+                'roll_number': student.roll_number,
+                'email': '',
+                'error': 'No Gmail address found'
+            }
+        
+        if not student.exam_hall_number:
+            return {
+                'success': False,
+                'student_id': student.id,
+                'roll_number': student.roll_number,
+                'email': student.gmail_address,
+                'error': 'No exam hall number assigned'
+            }
+        
         subject = f'Exam Room Allocation - {student.roll_number} | MITS'
         
-        # Enhanced email template with year and section info
+        # Enhanced email template
         message = f"""
 Dear {student.name},
 
@@ -348,7 +336,6 @@ Your exam room has been allocated for the upcoming examination.
 🎓 Roll Number: {student.roll_number}
 🏛️ Branch: {student.get_branch_display()}
 📅 Year: {student.get_year_display()}
-📖 Section: {student.get_section_display()}
 🏢 Exam Hall Number: {student.exam_hall_number}
 📧 Contact Email: {student.gmail_address}
 
@@ -429,6 +416,7 @@ def get_statistics(request):
     total_students = Student.objects.count()
     emails_sent = Student.objects.filter(email_sent=True).count()
     students_with_gmail = Student.objects.exclude(gmail_address='').count()
+    students_with_room = Student.objects.exclude(exam_hall_number='').count()
     
     # Branch-wise statistics
     branches_stats = {}
@@ -440,6 +428,7 @@ def get_statistics(request):
                 'name': branch_name,
                 'count': count,
                 'emails_sent': branch_students.filter(email_sent=True).count(),
+                'with_room': branch_students.exclude(exam_hall_number='').count(),
                 'years': {}
             }
             
@@ -452,23 +441,13 @@ def get_statistics(request):
                         'name': year_name,
                         'count': year_count,
                         'emails_sent': year_students.filter(email_sent=True).count(),
-                        'sections': {}
+                        'with_room': year_students.exclude(exam_hall_number='').count()
                     }
-                    
-                    # Section-wise breakdown for each year
-                    for section_code, section_name in Student.SECTION_CHOICES:
-                        section_students = year_students.filter(section=section_code)
-                        section_count = section_students.count()
-                        if section_count > 0:
-                            branches_stats[branch_code]['years'][year_code]['sections'][section_code] = {
-                                'name': section_name,
-                                'count': section_count,
-                                'emails_sent': section_students.filter(email_sent=True).count()
-                            }
     
     return Response({
         'total_students': total_students,
         'students_with_gmail': students_with_gmail,
+        'students_with_room': students_with_room,
         'emails_sent': emails_sent,
         'emails_pending': total_students - emails_sent,
         'branches_statistics': branches_stats

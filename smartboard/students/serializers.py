@@ -9,16 +9,14 @@ class StudentSerializer(serializers.ModelSerializer):
     full_class_info = serializers.ReadOnlyField()
     branch_display = serializers.CharField(source='get_branch_display', read_only=True)
     year_display = serializers.CharField(source='get_year_display', read_only=True)
-    section_display = serializers.CharField(source='get_section_display', read_only=True)
     
     class Meta:
         model = Student
         fields = [
             'id', 'name', 'roll_number', 'phone_number', 
             'gmail_address', 'branch', 'branch_display', 'year', 'year_display',
-            'section', 'section_display', 'exam_hall_number', 
-            'email_sent', 'email_address', 'institutional_email', 'full_class_info',
-            'created_at', 'updated_at'
+            'exam_hall_number', 'email_sent', 'email_address', 'institutional_email', 
+            'full_class_info', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'email_sent', 'created_at', 'updated_at']
 
@@ -27,22 +25,21 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'name', 'roll_number', 'phone_number', 
-            'gmail_address', 'branch', 'year', 'section', 'exam_hall_number'
+            'gmail_address', 'branch', 'year', 'exam_hall_number'
         ]
     
     def validate_gmail_address(self, value):
         """Validate that the email is a Gmail address"""
-        if not value.lower().endswith('@gmail.com'):
+        if value and not value.lower().endswith('@gmail.com'):
             raise serializers.ValidationError(
                 "Please provide a valid Gmail address ending with @gmail.com"
             )
-        return value.lower()
+        return value.lower() if value else value
     
     def validate(self, data):
-        """Validate branch, year, and section combinations"""
+        """Validate branch and year combinations"""
         branch = data.get('branch')
         year = data.get('year')
-        section = data.get('section')
         
         # Check if branch is valid
         valid_branches = [choice[0] for choice in Student.BRANCH_CHOICES]
@@ -54,14 +51,9 @@ class StudentCreateSerializer(serializers.ModelSerializer):
         if year not in valid_years:
             raise serializers.ValidationError(f"Invalid year. Choose from: {', '.join(valid_years)}")
         
-        # Check if section is valid
-        valid_sections = [choice[0] for choice in Student.SECTION_CHOICES]
-        if section not in valid_sections:
-            raise serializers.ValidationError(f"Invalid section. Choose from: {', '.join(valid_sections)}")
-        
         return data
 
-class FileUploadSerializer(serializers.Serializer):
+class ExamRoomUploadSerializer(serializers.Serializer):
     file = serializers.FileField()
     send_emails = serializers.BooleanField(default=True)
     
@@ -74,7 +66,7 @@ class FileUploadSerializer(serializers.Serializer):
         return value
     
     def process_file(self, file, send_emails=True):
-        """Process uploaded file and create student records"""
+        """Process uploaded file and update student exam room numbers"""
         try:
             # Read file based on extension
             if file.name.endswith('.csv'):
@@ -82,50 +74,67 @@ class FileUploadSerializer(serializers.Serializer):
             else:
                 df = pd.read_excel(file)
             
-            # Validate required columns (now includes year and section)
-            required_columns = ['name', 'roll_number', 'phone_number', 'gmail_address', 'branch', 'year', 'section', 'exam_hall_number']
-            missing_columns = [col for col in required_columns if col not in df.columns]
+            # Expected columns: S.No, Roll No, Room No
+            expected_columns = ['S.No', 'Roll No', 'Room No']
+            
+            # Check if all required columns are present (case insensitive)
+            df_columns = [col.strip() for col in df.columns]
+            missing_columns = []
+            column_mapping = {}
+            
+            for expected_col in expected_columns:
+                found = False
+                for df_col in df_columns:
+                    if df_col.lower() == expected_col.lower():
+                        column_mapping[expected_col] = df_col
+                        found = True
+                        break
+                if not found:
+                    missing_columns.append(expected_col)
             
             if missing_columns:
                 raise serializers.ValidationError(
-                    f"Missing required columns: {', '.join(missing_columns)}"
+                    f"Missing required columns: {', '.join(missing_columns)}. "
+                    f"Expected columns: {', '.join(expected_columns)}"
                 )
             
+            # Rename columns to standard format
+            df = df.rename(columns={
+                column_mapping['S.No']: 'sno',
+                column_mapping['Roll No']: 'roll_number',
+                column_mapping['Room No']: 'room_number'
+            })
+            
             # Clean and validate data
-            df = df.dropna(subset=required_columns)
-            students_data = []
+            df = df.dropna(subset=['roll_number', 'room_number'])
+            
+            processed_data = []
             errors = []
             
             for index, row in df.iterrows():
                 try:
-                    student_data = {
-                        'name': str(row['name']).strip(),
-                        'roll_number': str(row['roll_number']).strip().upper(),
-                        'phone_number': str(row['phone_number']).strip(),
-                        'gmail_address': str(row['gmail_address']).strip().lower(),
-                        'branch': str(row['branch']).strip().upper(),
-                        'year': str(row['year']).strip(),
-                        'section': str(row['section']).strip().upper(),
-                        'exam_hall_number': str(row['exam_hall_number']).strip(),
-                    }
+                    roll_number = str(row['roll_number']).strip().upper()
+                    room_number = str(row['room_number']).strip()
                     
-                    # Validate individual student data
-                    serializer = StudentCreateSerializer(data=student_data)
-                    if serializer.is_valid():
-                        students_data.append(student_data)
-                    else:
-                        errors.append(f"Row {index + 2}: {serializer.errors}")
-                        
+                    if not roll_number or not room_number:
+                        errors.append(f"Row {index + 2}: Roll number and room number cannot be empty")
+                        continue
+                    
+                    processed_data.append({
+                        'roll_number': roll_number,
+                        'room_number': room_number
+                    })
+                    
                 except Exception as e:
                     errors.append(f"Row {index + 2}: {str(e)}")
             
             if errors:
                 raise serializers.ValidationError({
                     'file_errors': errors,
-                    'valid_records': len(students_data)
+                    'valid_records': len(processed_data)
                 })
             
-            return students_data
+            return processed_data
             
         except Exception as e:
             if isinstance(e, serializers.ValidationError):

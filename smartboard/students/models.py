@@ -11,10 +11,9 @@ class Student(models.Model):
         ('CSC', 'Computer Science & Engineering - Cyber Security (CSC)'),
         ('ECE', 'Electronics and Communication Engineering (ECE)'),
         ('EEE', 'Electrical and Electronics Engineering (EEE)'),
-        ('MEC', 'Mechanical Engineering (MEC)'),
+        ('ME', 'Mechanical Engineering (ME)'),
         ('CIV', 'Civil Engineering (CIV)'),
     ]
-
     
     YEAR_CHOICES = [
         ('1', '1st Year'),
@@ -23,23 +22,10 @@ class Student(models.Model):
         ('4', '4th Year'),
     ]
     
-    SECTION_CHOICES = [
-        ('A', 'Section A'),
-        ('B', 'Section B'),
-        ('C', 'Section C'),
-        ('D', 'Section D'),
-        ('E', 'Section E'),
-        ('F', 'Section F'),
-        ('G', 'Section G'),
-        ('H', 'Section H'),
-        ('I', 'Section I'),
-        ('J', 'Section J'),
-    ]
-    
     name = models.CharField(max_length=100)
     
     roll_number = models.CharField(
-        max_length=20, 
+        max_length=20,
         unique=True,
         validators=[RegexValidator(
             regex=r'^[A-Za-z0-9]+$',
@@ -52,7 +38,9 @@ class Student(models.Model):
         validators=[RegexValidator(
             regex=r'^\+?1?\d{9,15}$',
             message='Phone number must be 9-15 digits'
-        )]
+        )],
+        null=True,
+        blank=True
     )
     
     gmail_address = models.EmailField(
@@ -64,21 +52,20 @@ class Student(models.Model):
     )
     
     branch = models.CharField(max_length=10, choices=BRANCH_CHOICES)
-    year = models.CharField(max_length=1, choices=YEAR_CHOICES, default='1')  # Added default
-    section = models.CharField(max_length=1, choices=SECTION_CHOICES, default='A')  # Added default
-    exam_hall_number = models.CharField(max_length=20)
+    year = models.CharField(max_length=1, choices=YEAR_CHOICES, default='1')
+    exam_hall_number = models.CharField(max_length=20, null=True, blank=True)
     email_sent = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['branch', 'year', 'section', 'roll_number']
+        ordering = ['branch', 'year', 'roll_number']
         verbose_name = 'Student'
         verbose_name_plural = 'Students'
-        unique_together = ['branch', 'year', 'section', 'roll_number']
+        unique_together = ['branch', 'year', 'roll_number']
     
     def __str__(self):
-        return f"{self.roll_number} - {self.name} ({self.branch} {self.year}-{self.section})"
+        return f"{self.roll_number} - {self.name} ({self.branch} {self.year})"
     
     @property
     def email_address(self):
@@ -90,4 +77,4 @@ class Student(models.Model):
     
     @property
     def full_class_info(self):
-        return f"{self.get_branch_display()} - {self.get_year_display()} - {self.get_section_display()}"
+        return f"{self.get_branch_display()} - {self.get_year_display()}"
