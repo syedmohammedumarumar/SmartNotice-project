@@ -182,6 +182,54 @@ Authenticate user with email and password.
 }
 ```
 
+## User Logout
+
+### Endpoint
+**POST** `/api/auth/logout/`
+
+### Description
+Logs out the current user by blacklisting their refresh token, preventing further token refresh operations.
+
+### Authentication
+- **Required**: Yes
+- **Type**: Bearer Token
+- **Header**: `Authorization: Bearer <access_token>`
+
+### Request Body
+```json
+{
+    "refresh_token": "your_refresh_token_here"
+}
+```
+
+### Success Response
+**Status Code**: `200 OK`
+
+```json
+{
+    "message": "Logout successful"
+}
+```
+
+### Error Responses
+
+#### Missing or Invalid Token
+**Status Code**: `401 Unauthorized`
+```json
+{
+    "detail": "Authentication credentials were not provided."
+}
+```
+
+#### Invalid Refresh Token
+**Status Code**: `400 Bad Request`
+```json
+{
+    "message": "Error during logout",
+    "error": "Token is invalid or expired"
+}
+```
+
 ### 4. Get User Profile
 **Endpoint:** `GET /api/auth/profile/`
 
