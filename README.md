@@ -493,9 +493,9 @@ S.No,Roll No,Room No
 }
 ```
 
-### 2. Email Operations -- Frontend team Need not to integrate this api 
+### 2. Email Operations  
 
-#### 2.1 Test Email Configuration
+#### 2.1 Test Email Configuration -- Frontend team Need not to integrate this api
 **Endpoint:** `POST /api/students/test-email/`
 
 **Headers:** `Authorization: Bearer <access_token>`
