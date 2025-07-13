@@ -93,8 +93,7 @@ def user_profile(request):
         'user': serializer.data
     }, status=status.HTTP_200_OK)
 
-
-@api_view(['PUT'])
+@api_view(['PUT'])  
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     """Update current user profile"""

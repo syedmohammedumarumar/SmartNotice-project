@@ -409,26 +409,87 @@ def send_bulk_emails(students):
     logger.info(f"Bulk email completed: {successful_count}/{len(students)} emails sent successfully")
     return results
 
+# Enhanced students/views.py - Add this updated get_statistics function
+
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def get_statistics(request):
-    """Get system statistics with hierarchical breakdown"""
+    """Get system statistics with hierarchical breakdown and pending email details"""
     total_students = Student.objects.count()
     emails_sent = Student.objects.filter(email_sent=True).count()
     students_with_gmail = Student.objects.exclude(gmail_address='').count()
     students_with_room = Student.objects.exclude(exam_hall_number='').count()
     
-    # Branch-wise statistics
+    # Students ready for email but not sent yet (have both gmail and room number)
+    students_ready_for_email = Student.objects.filter(
+        gmail_address__isnull=False,
+        exam_hall_number__isnull=False,
+        email_sent=False
+    ).exclude(
+        gmail_address='',
+        exam_hall_number=''
+    )
+    
+    # Students who can't receive emails (missing gmail or room)
+    students_missing_gmail = Student.objects.filter(
+        Q(gmail_address__isnull=True) | Q(gmail_address='')
+    )
+    
+    students_missing_room = Student.objects.filter(
+        Q(exam_hall_number__isnull=True) | Q(exam_hall_number='')
+    )
+    
+    # Branch-wise statistics with detailed breakdown
     branches_stats = {}
     for branch_code, branch_name in Student.BRANCH_CHOICES:
         branch_students = Student.objects.filter(branch=branch_code)
         count = branch_students.count()
+        
         if count > 0:
+            # Branch level statistics
+            branch_emails_sent = branch_students.filter(email_sent=True).count()
+            branch_with_room = branch_students.exclude(exam_hall_number='').count()
+            branch_with_gmail = branch_students.exclude(gmail_address='').count()
+            
+            # Students ready for email (have both gmail and room but email not sent)
+            branch_ready_for_email = branch_students.filter(
+                gmail_address__isnull=False,
+                exam_hall_number__isnull=False,
+                email_sent=False
+            ).exclude(
+                gmail_address='',
+                exam_hall_number=''
+            )
+            
+            # Students missing requirements
+            branch_missing_gmail = branch_students.filter(
+                Q(gmail_address__isnull=True) | Q(gmail_address='')
+            )
+            
+            branch_missing_room = branch_students.filter(
+                Q(exam_hall_number__isnull=True) | Q(exam_hall_number='')
+            )
+            
             branches_stats[branch_code] = {
                 'name': branch_name,
                 'count': count,
-                'emails_sent': branch_students.filter(email_sent=True).count(),
-                'with_room': branch_students.exclude(exam_hall_number='').count(),
+                'emails_sent': branch_emails_sent,
+                'with_room': branch_with_room,
+                'with_gmail': branch_with_gmail,
+                'ready_for_email': branch_ready_for_email.count(),
+                'missing_gmail': branch_missing_gmail.count(),
+                'missing_room': branch_missing_room.count(),
+                'pending_email_students': [
+                    {
+                        'id': student.id,
+                        'roll_number': student.roll_number,
+                        'name': student.name,
+                        'gmail_address': student.gmail_address,
+                        'exam_hall_number': student.exam_hall_number,
+                        'year': student.year
+                    }
+                    for student in branch_ready_for_email
+                ],
                 'years': {}
             }
             
@@ -436,12 +497,69 @@ def get_statistics(request):
             for year_code, year_name in Student.YEAR_CHOICES:
                 year_students = branch_students.filter(year=year_code)
                 year_count = year_students.count()
+                
                 if year_count > 0:
+                    year_emails_sent = year_students.filter(email_sent=True).count()
+                    year_with_room = year_students.exclude(exam_hall_number='').count()
+                    year_with_gmail = year_students.exclude(gmail_address='').count()
+                    
+                    # Year level ready for email
+                    year_ready_for_email = year_students.filter(
+                        gmail_address__isnull=False,
+                        exam_hall_number__isnull=False,
+                        email_sent=False
+                    ).exclude(
+                        gmail_address='',
+                        exam_hall_number=''
+                    )
+                    
+                    # Year level missing requirements
+                    year_missing_gmail = year_students.filter(
+                        Q(gmail_address__isnull=True) | Q(gmail_address='')
+                    )
+                    
+                    year_missing_room = year_students.filter(
+                        Q(exam_hall_number__isnull=True) | Q(exam_hall_number='')
+                    )
+                    
                     branches_stats[branch_code]['years'][year_code] = {
                         'name': year_name,
                         'count': year_count,
-                        'emails_sent': year_students.filter(email_sent=True).count(),
-                        'with_room': year_students.exclude(exam_hall_number='').count()
+                        'emails_sent': year_emails_sent,
+                        'emails_pending': year_count - year_emails_sent,
+                        'with_room': year_with_room,
+                        'with_gmail': year_with_gmail,
+                        'ready_for_email': year_ready_for_email.count(),
+                        'missing_gmail': year_missing_gmail.count(),
+                        'missing_room': year_missing_room.count(),
+                        'pending_email_students': [
+                            {
+                                'id': student.id,
+                                'roll_number': student.roll_number,
+                                'name': student.name,
+                                'gmail_address': student.gmail_address,
+                                'exam_hall_number': student.exam_hall_number
+                            }
+                            for student in year_ready_for_email
+                        ],
+                        'missing_gmail_students': [
+                            {
+                                'id': student.id,
+                                'roll_number': student.roll_number,
+                                'name': student.name,
+                                'exam_hall_number': student.exam_hall_number or 'Not assigned'
+                            }
+                            for student in year_missing_gmail
+                        ],
+                        'missing_room_students': [
+                            {
+                                'id': student.id,
+                                'roll_number': student.roll_number,
+                                'name': student.name,
+                                'gmail_address': student.gmail_address or 'Not provided'
+                            }
+                            for student in year_missing_room
+                        ]
                     }
     
     return Response({
@@ -450,7 +568,124 @@ def get_statistics(request):
         'students_with_room': students_with_room,
         'emails_sent': emails_sent,
         'emails_pending': total_students - emails_sent,
-        'branches_statistics': branches_stats
+        'students_ready_for_email': students_ready_for_email.count(),
+        'students_missing_gmail': students_missing_gmail.count(),
+        'students_missing_room': students_missing_room.count(),
+        'branches_statistics': branches_stats,
+        'global_pending_email_students': [
+            {
+                'id': student.id,
+                'roll_number': student.roll_number,
+                'name': student.name,
+                'branch': student.branch,
+                'year': student.year,
+                'gmail_address': student.gmail_address,
+                'exam_hall_number': student.exam_hall_number
+            }
+            for student in students_ready_for_email
+        ]
+    })
+
+
+# Add this new endpoint for resending emails to specific students
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def resend_emails_to_pending_students(request):
+    """Resend emails to students who have room numbers but haven't received emails"""
+    # Get filters from request
+    branch = request.data.get('branch')
+    year = request.data.get('year')
+    student_ids = request.data.get('student_ids', [])
+    
+    # Base queryset: students ready for email but not sent
+    queryset = Student.objects.filter(
+        gmail_address__isnull=False,
+        exam_hall_number__isnull=False,
+        email_sent=False
+    ).exclude(
+        gmail_address='',
+        exam_hall_number=''
+    )
+    
+    # Apply filters
+    if branch:
+        queryset = queryset.filter(branch=branch)
+    if year:
+        queryset = queryset.filter(year=year)
+    if student_ids:
+        queryset = queryset.filter(id__in=student_ids)
+    
+    if not queryset.exists():
+        return Response({
+            'error': 'No students found matching the criteria'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Send emails
+    email_results = send_bulk_emails(queryset)
+    
+    successful_emails = len([r for r in email_results if r['success']])
+    failed_emails = len([r for r in email_results if not r['success']])
+    
+    return Response({
+        'message': 'Resend email operation completed',
+        'total_students': queryset.count(),
+        'emails_sent': successful_emails,
+        'email_failures': failed_emails,
+        'results': email_results
+    })
+
+
+# Add this endpoint to get students by specific criteria for targeted email sending
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_students_by_email_status(request):
+    """Get students filtered by email status for targeted operations"""
+    status_filter = request.query_params.get('status', 'pending')  # pending, missing_gmail, missing_room
+    branch = request.query_params.get('branch')
+    year = request.query_params.get('year')
+    
+    # Base queryset
+    queryset = Student.objects.all()
+    
+    # Apply branch and year filters
+    if branch:
+        queryset = queryset.filter(branch=branch)
+    if year:
+        queryset = queryset.filter(year=year)
+    
+    # Apply status filter
+    if status_filter == 'pending':
+        # Students ready for email but not sent
+        queryset = queryset.filter(
+            gmail_address__isnull=False,
+            exam_hall_number__isnull=False,
+            email_sent=False
+        ).exclude(
+            gmail_address='',
+            exam_hall_number=''
+        )
+    elif status_filter == 'missing_gmail':
+        # Students missing Gmail address
+        queryset = queryset.filter(
+            Q(gmail_address__isnull=True) | Q(gmail_address='')
+        )
+    elif status_filter == 'missing_room':
+        # Students missing room number
+        queryset = queryset.filter(
+            Q(exam_hall_number__isnull=True) | Q(exam_hall_number='')
+        )
+    elif status_filter == 'sent':
+        # Students who have been sent emails
+        queryset = queryset.filter(email_sent=True)
+    
+    serializer = StudentSerializer(queryset.order_by('branch', 'year', 'roll_number'), many=True)
+    
+    return Response({
+        'status_filter': status_filter,
+        'branch': branch,
+        'year': year,
+        'students': serializer.data,
+        'total_students': len(serializer.data)
     })
 
 @api_view(['POST'])
