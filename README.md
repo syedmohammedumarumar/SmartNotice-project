@@ -6,10 +6,11 @@
 3. [Authentication System](#authentication-system)
 4. [Student Management APIs](#student-management-apis)
 5. [File Upload & Email Operations](#file-upload--email-operations)
-6. [Statistics & Analytics](#statistics--analytics)
+6. [Enhanced Statistics & Email Management](#enhanced-statistics--email-management)
 7. [Testing Guide](#testing-guide)
 8. [Error Handling](#error-handling)
-9. [Postman Collection Setup](#postman-collection-setup)
+9. [Use Cases & Workflows](#use-cases--workflows)
+10. [Best Practices](#best-practices)
 
 ---
 
@@ -20,8 +21,9 @@ SmartNotice is a comprehensive student management system that provides:
 - Complete student CRUD operations
 - Hierarchical data organization (Branch → Year → Students)
 - File upload for exam room assignments
-- Email notification system
-- Statistics and analytics
+- Email notification system with enhanced tracking
+- Advanced statistics and analytics
+- Targeted email resending capabilities
 
 ---
 
@@ -182,55 +184,33 @@ Authenticate user with email and password.
 }
 ```
 
-## User Logout
+### 4. User Logout
 
-### Endpoint
-**POST** `/api/auth/logout/`
+**Endpoint:** `POST /api/auth/logout/`
 
-### Description
-Logs out the current user by blacklisting their refresh token, preventing further token refresh operations.
+**Description:** Logs out the current user by blacklisting their refresh token, preventing further token refresh operations.
 
-### Authentication
-- **Required**: Yes
-- **Type**: Bearer Token
-- **Header**: `Authorization: Bearer <access_token>`
+**Authentication:** Required - Bearer Token
 
-### Request Body
+**Request Body:**
 ```json
 {
     "refresh_token": "your_refresh_token_here"
 }
 ```
 
-### Success Response
-**Status Code**: `200 OK`
-
+**Success Response (200 OK):**
 ```json
 {
     "message": "Logout successful"
 }
 ```
 
-### Error Responses
+**Error Responses:**
+- **401 Unauthorized**: Missing or invalid token
+- **400 Bad Request**: Invalid refresh token
 
-#### Missing or Invalid Token
-**Status Code**: `401 Unauthorized`
-```json
-{
-    "detail": "Authentication credentials were not provided."
-}
-```
-
-#### Invalid Refresh Token
-**Status Code**: `400 Bad Request`
-```json
-{
-    "message": "Error during logout",
-    "error": "Token is invalid or expired"
-}
-```
-
-### 4. Get User Profile
+### 5. Get User Profile
 **Endpoint:** `GET /api/auth/profile/`
 
 **Headers:** `Authorization: Bearer <access_token>`
@@ -493,12 +473,14 @@ S.No,Roll No,Room No
 }
 ```
 
-### 2. Email Operations  
+### 2. Email Operations
 
-#### 2.1 Test Email Configuration -- Frontend team Need not to integrate this api
+#### 2.1 Test Email Configuration
 **Endpoint:** `POST /api/students/test-email/`
 
 **Headers:** `Authorization: Bearer <access_token>`
+
+**Note:** Frontend team need not integrate this API
 
 **Success Response (200 OK):**
 ```json
@@ -558,57 +540,422 @@ S.No,Roll No,Room No
 
 ---
 
-## Statistics & Analytics
+## Enhanced Statistics & Email Management
 
-### Get System Statistics
+### 1. Enhanced Statistics API
+
+#### Get Enhanced Statistics
 **Endpoint:** `GET /api/students/statistics/`
 
 **Headers:** `Authorization: Bearer <access_token>`
 
-**Success Response (200 OK):**
+**Enhanced Response (200 OK):**
 ```json
 {
     "total_students": 500,
     "students_with_gmail": 450,
     "students_with_room": 400,
-    "emails_sent": 350,
-    "emails_pending": 150,
+    "emails_sent": 300,
+    "emails_pending": 200,
+    "students_ready_for_email": 150,
+    "students_missing_gmail": 50,
+    "students_missing_room": 100,
     "branches_statistics": {
         "CSE": {
             "name": "Computer Science & Engineering (CSE)",
-            "count": 150,
+            "count": 160,
             "emails_sent": 120,
             "with_room": 140,
+            "with_gmail": 150,
+            "ready_for_email": 30,
+            "missing_gmail": 10,
+            "missing_room": 20,
+            "pending_email_students": [
+                {
+                    "id": 1,
+                    "roll_number": "21CSE001",
+                    "name": "John Doe",
+                    "gmail_address": "john.doe@gmail.com",
+                    "exam_hall_number": "101",
+                    "year": "2"
+                },
+                {
+                    "id": 2,
+                    "roll_number": "21CSE002",
+                    "name": "Jane Smith",
+                    "gmail_address": "jane.smith@gmail.com",
+                    "exam_hall_number": "102",
+                    "year": "2"
+                }
+            ],
             "years": {
                 "1": {
                     "name": "1st Year",
                     "count": 40,
                     "emails_sent": 35,
-                    "with_room": 38
+                    "emails_pending": 5,
+                    "with_room": 38,
+                    "with_gmail": 39,
+                    "ready_for_email": 3,
+                    "missing_gmail": 1,
+                    "missing_room": 2,
+                    "pending_email_students": [
+                        {
+                            "id": 3,
+                            "roll_number": "23CSE001",
+                            "name": "Alice Johnson",
+                            "gmail_address": "alice.johnson@gmail.com",
+                            "exam_hall_number": "103"
+                        },
+                        {
+                            "id": 4,
+                            "roll_number": "23CSE002",
+                            "name": "Bob Wilson",
+                            "gmail_address": "bob.wilson@gmail.com",
+                            "exam_hall_number": "104"
+                        }
+                    ],
+                    "missing_gmail_students": [
+                        {
+                            "id": 5,
+                            "roll_number": "23CSE003",
+                            "name": "Charlie Brown",
+                            "exam_hall_number": "105"
+                        }
+                    ],
+                    "missing_room_students": [
+                        {
+                            "id": 6,
+                            "roll_number": "23CSE004",
+                            "name": "Diana Prince",
+                            "gmail_address": "diana.prince@gmail.com"
+                        }
+                    ]
                 },
                 "2": {
                     "name": "2nd Year",
                     "count": 45,
-                    "emails_sent": 40,
-                    "with_room": 42
+                    "emails_sent": 30,
+                    "emails_pending": 15,
+                    "with_room": 40,
+                    "with_gmail": 42,
+                    "ready_for_email": 12,
+                    "missing_gmail": 3,
+                    "missing_room": 5,
+                    "pending_email_students": [
+                        {
+                            "id": 7,
+                            "roll_number": "22CSE001",
+                            "name": "Eve Adams",
+                            "gmail_address": "eve.adams@gmail.com",
+                            "exam_hall_number": "201"
+                        }
+                    ],
+                    "missing_gmail_students": [],
+                    "missing_room_students": []
                 }
             }
         },
         "ECE": {
             "name": "Electronics & Communication Engineering (ECE)",
             "count": 120,
-            "emails_sent": 100,
-            "with_room": 110,
+            "emails_sent": 80,
+            "with_room": 100,
+            "with_gmail": 110,
+            "ready_for_email": 20,
+            "missing_gmail": 10,
+            "missing_room": 20,
+            "pending_email_students": [
+                {
+                    "id": 8,
+                    "roll_number": "21ECE001",
+                    "name": "Frank Miller",
+                    "gmail_address": "frank.miller@gmail.com",
+                    "exam_hall_number": "301",
+                    "year": "3"
+                }
+            ],
             "years": {
                 "1": {
                     "name": "1st Year",
-                    "count": 35,
-                    "emails_sent": 30,
-                    "with_room": 32
+                    "count": 30,
+                    "emails_sent": 25,
+                    "emails_pending": 5,
+                    "with_room": 28,
+                    "with_gmail": 29,
+                    "ready_for_email": 3,
+                    "missing_gmail": 1,
+                    "missing_room": 2,
+                    "pending_email_students": [
+                        {
+                            "id": 9,
+                            "roll_number": "23ECE001",
+                            "name": "Grace Lee",
+                            "gmail_address": "grace.lee@gmail.com",
+                            "exam_hall_number": "302"
+                        }
+                    ],
+                    "missing_gmail_students": [],
+                    "missing_room_students": []
                 }
             }
         }
-    }
+    },
+    "global_pending_email_students": [
+        {
+            "id": 1,
+            "roll_number": "21CSE001",
+            "name": "John Doe",
+            "branch": "CSE",
+            "year": "2",
+            "gmail_address": "john.doe@gmail.com",
+            "exam_hall_number": "101"
+        },
+        {
+            "id": 2,
+            "roll_number": "21CSE002",
+            "name": "Jane Smith",
+            "branch": "CSE",
+            "year": "2",
+            "gmail_address": "jane.smith@gmail.com",
+            "exam_hall_number": "102"
+        }
+    ]
+}
+```
+
+#### Enhanced Fields Explanation
+
+**Global Level:**
+- `students_ready_for_email`: Students who have both Gmail and room number but haven't received emails
+- `students_missing_gmail`: Students without Gmail addresses
+- `students_missing_room`: Students without room assignments
+- `global_pending_email_students`: Complete list of all students ready for email resending
+
+**Branch Level:**
+- `ready_for_email`: Count of students ready for email but not sent
+- `pending_email_students`: Detailed list of students ready for email resending
+- `missing_gmail`: Count of students without Gmail addresses
+- `missing_room`: Count of students without room assignments
+
+**Year Level:**
+- `emails_pending`: Count of students with pending email status
+- `ready_for_email`: Count of students ready for email resending
+- `pending_email_students`: Detailed student list ready for emails
+- `missing_gmail_students`: Students without Gmail addresses
+- `missing_room_students`: Students without room assignments
+
+### 2. Students by Email Status API
+
+#### Get Students by Email Status
+**Endpoint:** `GET /api/students/students-by-email-status/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Query Parameters:**
+- `status`: `pending` | `missing_gmail` | `missing_room` | `sent` (required)
+- `branch`: Branch code (optional)
+- `year`: Year code (optional)
+
+#### Examples
+
+##### Get Students Ready for Email (Pending)
+```
+GET /api/students/students-by-email-status/?status=pending&branch=CSE&year=2
+```
+
+**Response (200 OK):**
+```json
+{
+    "status_filter": "pending",
+    "branch": "CSE",
+    "year": "2",
+    "students": [
+        {
+            "id": 1,
+            "roll_number": "21CSE001",
+            "name": "John Doe",
+            "gmail_address": "john.doe@gmail.com",
+            "exam_hall_number": "101",
+            "branch": "CSE",
+            "year": "2",
+            "email_sent": false
+        },
+        {
+            "id": 2,
+            "roll_number": "21CSE002",
+            "name": "Jane Smith",
+            "gmail_address": "jane.smith@gmail.com",
+            "exam_hall_number": "102",
+            "branch": "CSE",
+            "year": "2",
+            "email_sent": false
+        }
+    ],
+    "total_students": 2
+}
+```
+
+##### Get Students Missing Gmail
+```
+GET /api/students/students-by-email-status/?status=missing_gmail&branch=CSE
+```
+
+**Response (200 OK):**
+```json
+{
+    "status_filter": "missing_gmail",
+    "branch": "CSE",
+    "students": [
+        {
+            "id": 5,
+            "roll_number": "23CSE003",
+            "name": "Charlie Brown",
+            "gmail_address": null,
+            "exam_hall_number": "105",
+            "branch": "CSE",
+            "year": "1",
+            "email_sent": false
+        }
+    ],
+    "total_students": 1
+}
+```
+
+##### Get Students Missing Room
+```
+GET /api/students/students-by-email-status/?status=missing_room&branch=ECE&year=1
+```
+
+**Response (200 OK):**
+```json
+{
+    "status_filter": "missing_room",
+    "branch": "ECE",
+    "year": "1",
+    "students": [
+        {
+            "id": 10,
+            "roll_number": "23ECE002",
+            "name": "Helen Carter",
+            "gmail_address": "helen.carter@gmail.com",
+            "exam_hall_number": null,
+            "branch": "ECE",
+            "year": "1",
+            "email_sent": false
+        }
+    ],
+    "total_students": 1
+}
+```
+
+##### Get Students with Sent Emails
+```
+GET /api/students/students-by-email-status/?status=sent&branch=CSE
+```
+
+**Response (200 OK):**
+```json
+{
+    "status_filter": "sent",
+    "branch": "CSE",
+    "students": [
+        {
+            "id": 11,
+            "roll_number": "21CSE010",
+            "name": "Mike Johnson",
+            "gmail_address": "mike.johnson@gmail.com",
+            "exam_hall_number": "110",
+            "branch": "CSE",
+            "year": "2",
+            "email_sent": true
+        }
+    ],
+    "total_students": 1
+}
+```
+
+### 3. Resend Pending Emails API
+
+#### Resend Emails to Pending Students
+**Endpoint:** `POST /api/students/resend-pending-emails/`
+
+**Headers:** `Authorization: Bearer <access_token>`
+
+**Request Body Options:**
+
+##### Option 1: Resend to All Pending Students
+```json
+{
+    "send_to_all": true
+}
+```
+
+##### Option 2: Resend by Branch and Year
+```json
+{
+    "branch": "CSE",
+    "year": "2"
+}
+```
+
+##### Option 3: Resend to Specific Students
+```json
+{
+    "student_ids": [1, 2, 3, 4, 5]
+}
+```
+
+##### Option 4: Combined Filters
+```json
+{
+    "branch": "CSE",
+    "year": "2",
+    "student_ids": [1, 2, 3]
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+    "message": "Resend email operation completed",
+    "total_students": 3,
+    "emails_sent": 2,
+    "email_failures": 1,
+    "results": [
+        {
+            "success": true,
+            "student_id": 1,
+            "roll_number": "21CSE001",
+            "name": "John Doe",
+            "email": "john.doe@gmail.com",
+            "message": "Email sent successfully to Gmail"
+        },
+        {
+            "success": true,
+            "student_id": 2,
+            "roll_number": "21CSE002",
+            "name": "Jane Smith",
+            "email": "jane.smith@gmail.com",
+            "message": "Email sent successfully to Gmail"
+        },
+        {
+            "success": false,
+            "student_id": 3,
+            "roll_number": "21CSE003",
+            "name": "Bob Wilson",
+            "email": "invalid.email@gmail.com",
+            "error": "SMTP Error: Invalid recipient"
+        }
+    ]
+}
+```
+
+**Error Response (400 Bad Request):**
+```json
+{
+    "error": "No students found matching the criteria",
+    "details": "No students with pending email status found for the specified filters"
 }
 ```
 
@@ -621,6 +968,8 @@ S.No,Roll No,Room No
 #### Step 1: User Registration
 ```bash
 POST /api/auth/register/
+Content-Type: application/json
+
 {
     "username": "testuser",
     "email": "testuser@example.com",
@@ -633,6 +982,8 @@ POST /api/auth/register/
 #### Step 2: User Login
 ```bash
 POST /api/auth/login/
+Content-Type: application/json
+
 {
     "email": "testuser@example.com",
     "password": "testpass123"
@@ -643,12 +994,16 @@ POST /api/auth/login/
 ```bash
 # Request OTP
 POST /api/auth/forgot-password/
+Content-Type: application/json
+
 {
     "email": "testuser@example.com"
 }
 
 # Verify OTP (Optional)
 POST /api/auth/verify-otp/
+Content-Type: application/json
+
 {
     "email": "testuser@example.com",
     "otp_code": "123456"
@@ -656,6 +1011,8 @@ POST /api/auth/verify-otp/
 
 # Reset Password
 POST /api/auth/reset-password/
+Content-Type: application/json
+
 {
     "email": "testuser@example.com",
     "otp_code": "123456",
@@ -664,11 +1021,31 @@ POST /api/auth/reset-password/
 }
 ```
 
+#### Step 4: Test Profile Access
+```bash
+GET /api/auth/profile/
+Authorization: Bearer <access_token>
+```
+
+#### Step 5: Test Logout
+```bash
+POST /api/auth/logout/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+    "refresh_token": "your_refresh_token_here"
+}
+```
+
 ### 2. Student Management Testing Workflow
 
 #### Step 1: Create Test Students
 ```bash
 POST /api/students/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
 {
     "name": "Alice Johnson",
     "roll_number": "21CSE001",
@@ -684,6 +1061,8 @@ POST /api/students/
 GET /api/students/?branch=CSE&year=2
 GET /api/students/?roll_number=21CSE001
 GET /api/students/?gmail=alice
+GET /api/students/?hall_number=A101
+Authorization: Bearer <access_token>
 ```
 
 #### Step 3: Test Hierarchical Data
@@ -692,6 +1071,24 @@ GET /api/students/branches/
 GET /api/students/branches/CSE/years/
 GET /api/students/branches/CSE/years/2/students/
 GET /api/students/hierarchy/
+Authorization: Bearer <access_token>
+```
+
+#### Step 4: Test Student Updates
+```bash
+PUT /api/students/1/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+    "name": "Alice Johnson Updated",
+    "roll_number": "21CSE001",
+    "phone_number": "9876543210",
+    "gmail_address": "alice.updated@gmail.com",
+    "branch": "CSE",
+    "year": "2",
+    "exam_hall_number": "A102"
+}
 ```
 
 ### 3. File Upload Testing
@@ -702,11 +1099,16 @@ S.No,Roll No,Room No
 1,21CSE001,A101
 2,21CSE002,A102
 3,21CSE003,A103
+4,21ECE001,B201
+5,21ECE002,B202
 ```
 
-#### Step 2: Upload File
+#### Step 2: Upload File Without Emails
 ```bash
 POST /api/students/upload-rooms/
+Authorization: Bearer <access_token>
+Content-Type: multipart/form-data
+
 Form-data:
 - file: test_rooms.csv
 - send_emails: false
@@ -715,193 +1117,523 @@ Form-data:
 #### Step 3: Upload with Email Sending
 ```bash
 POST /api/students/upload-rooms/
+Authorization: Bearer <access_token>
+Content-Type: multipart/form-data
+
 Form-data:
 - file: test_rooms.csv
 - send_emails: true
 ```
 
-### 4. Email Testing Workflow
+### 4. Enhanced Email Testing Workflow
 
-#### Step 1: Test Email Configuration
+#### Step 1: Test Enhanced Statistics
 ```bash
-POST /api/students/test-email/
+GET /api/students/statistics/
+Authorization: Bearer <access_token>
 ```
 
-#### Step 2: Send Individual Email
+#### Step 2: Test Email Status Filtering
+```bash
+# Get students ready for email
+GET /api/students/students-by-email-status/?status=pending&branch=CSE&year=2
+Authorization: Bearer <access_token>
+
+# Get students missing Gmail
+GET /api/students/students-by-email-status/?status=missing_gmail
+Authorization: Bearer <access_token>
+
+# Get students missing room
+GET /api/students/students-by-email-status/?status=missing_room&branch=ECE
+Authorization: Bearer <access_token>
+
+# Get students with sent emails
+GET /api/students/students-by-email-status/?status=sent&branch=CSE&year=1
+Authorization: Bearer <access_token>
+```
+
+#### Step 3: Test Individual Email Sending
 ```bash
 POST /api/students/1/send-email/
+Authorization: Bearer <access_token>
 ```
 
-#### Step 3: Send Bulk Emails
+#### Step 4: Test Bulk Email Operations
 ```bash
 POST /api/students/send-bulk-emails/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
 {
     "student_ids": [1, 2, 3, 4, 5]
 }
 ```
 
-#### Step 4: Check Statistics
+#### Step 5: Test Resend Operations
 ```bash
-GET /api/students/statistics/
+# Resend to all pending students
+POST /api/students/resend-pending-emails/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+    "send_to_all": true
+}
+
+# Resend by branch and year
+POST /api/students/resend-pending-emails/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+    "branch": "CSE",
+    "year": "2"
+}
+
+# Resend to specific students
+POST /api/students/resend-pending-emails/
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+    "student_ids": [1, 2, 3]
+}
+```
+
+### 5. Complete Testing Sequence
+
+#### Full System Test
+```bash
+# 1. Register and login
+POST /api/auth/register/ → Get tokens
+POST /api/auth/login/ → Verify login
+
+# 2. Create test data
+POST /api/students/ → Create multiple students
+GET /api/students/ → Verify creation
+
+# 3. Upload room assignments
+POST /api/students/upload-rooms/ → Upload CSV with send_emails=false
+
+# 4. Check statistics
+GET /api/students/statistics/ → Verify data integrity
+
+# 5. Test email operations
+GET /api/students/students-by-email-status/?status=pending
+POST /api/students/resend-pending-emails/ → Send emails
+
+# 6. Verify email status
+GET /api/students/statistics/ → Check updated counts
+GET /api/students/students-by-email-status/?status=sent
 ```
 
 ---
 
 ## Error Handling
 
-### HTTP Status Codes
-- **200 OK**: Successful GET, PUT, POST operations
-- **201 Created**: Successful resource creation
-- **204 No Content**: Successful DELETE operation
-- **400 Bad Request**: Invalid data or validation errors
-- **401 Unauthorized**: Missing or invalid authentication
-- **404 Not Found**: Resource not found
-- **500 Internal Server Error**: Server error
-
 ### Common Error Responses
 
-#### Authentication Errors
+#### 400 Bad Request
 ```json
 {
-    "detail": "Invalid email or password."
+    "error": "Validation failed",
+    "details": {
+        "email": ["This field is required."],
+        "password": ["Password must be at least 8 characters long."]
+    }
 }
 ```
 
-#### Validation Errors
+#### 401 Unauthorized
 ```json
 {
-    "name": ["This field is required."],
-    "roll_number": ["Student with this roll number already exists."],
-    "gmail_address": ["Enter a valid email address."]
+    "error": "Authentication failed",
+    "message": "Invalid credentials or token expired"
 }
 ```
 
-#### OTP Errors
+#### 403 Forbidden
 ```json
 {
-    "otp_code": ["Invalid OTP code."]
+    "error": "Permission denied",
+    "message": "You don't have permission to access this resource"
 }
 ```
 
-#### File Upload Errors
+#### 404 Not Found
 ```json
 {
-    "error": "Invalid file format. Please upload Excel or CSV file.",
-    "details": "Supported formats: .xlsx, .xls, .csv"
+    "error": "Resource not found",
+    "message": "Student with id 999 does not exist"
+}
+```
+
+#### 409 Conflict
+```json
+{
+    "error": "Duplicate entry",
+    "message": "Student with roll number 21CSE001 already exists"
+}
+```
+
+#### 500 Internal Server Error
+```json
+{
+    "error": "Internal server error",
+    "message": "An unexpected error occurred. Please try again later."
+}
+```
+
+### Authentication-Specific Errors
+
+#### Invalid OTP
+```json
+{
+    "error": "Invalid OTP",
+    "message": "The OTP code is invalid or has expired. Please request a new one."
+}
+```
+
+#### Password Mismatch
+```json
+{
+    "error": "Password confirmation failed",
+    "message": "Password and confirmation password do not match"
+}
+```
+
+#### Token Expired
+```json
+{
+    "error": "Token expired",
+    "message": "Your session has expired. Please login again."
+}
+```
+
+### File Upload Errors
+
+#### Invalid File Format
+```json
+{
+    "error": "Invalid file format",
+    "message": "Only CSV and Excel files are supported"
+}
+```
+
+#### File Processing Error
+```json
+{
+    "error": "File processing failed",
+    "message": "Unable to process the uploaded file. Please check the format and try again.",
+    "details": {
+        "line_errors": [
+            {
+                "line": 5,
+                "error": "Invalid roll number format"
+            }
+        ]
+    }
+}
+```
+
+### Email Operation Errors
+
+#### SMTP Configuration Error
+```json
+{
+    "error": "Email configuration error",
+    "message": "Email service is not properly configured. Please contact administrator."
+}
+```
+
+#### Bulk Email Failure
+```json
+{
+    "error": "Bulk email operation failed",
+    "message": "Some emails could not be sent",
+    "details": {
+        "total_requested": 10,
+        "successful": 7,
+        "failed": 3,
+        "failed_students": [
+            {
+                "id": 5,
+                "roll_number": "21CSE005",
+                "error": "Invalid email address"
+            }
+        ]
+    }
 }
 ```
 
 ---
+## Use Cases & Workflows
 
-## Postman Collection Setup
+### 1. New Semester Setup Workflow
 
-### 1. Collection Variables
-```
-base_url: http://localhost:8000
-auth_token: {{your_jwt_token}}
-student_id: 1
-```
+#### Step 1: Initial Data Setup
+```bash
+# Create students for new semester
+POST /api/students/ (for each student)
 
-### 2. Pre-request Script for Authentication
-```javascript
-// Add this to collection pre-request script
-if (pm.info.requestName !== 'Login' && pm.info.requestName !== 'Register') {
-    pm.request.headers.add({
-        key: 'Authorization',
-        value: 'Bearer ' + pm.collectionVariables.get('auth_token')
-    });
-}
+# Verify data
+GET /api/students/hierarchy/
+GET /api/students/statistics/
 ```
 
-### 3. Test Script for Login
-```javascript
-// Add this to Login request test script
-if (pm.response.code === 200) {
-    var jsonData = pm.response.json();
-    pm.collectionVariables.set('auth_token', jsonData.tokens.access);
-}
+#### Step 2: Room Assignment Process
+```bash
+# Upload room assignments
+POST /api/students/upload-rooms/ (send_emails=false)
+
+# Verify assignments
+GET /api/students/statistics/
+GET /api/students/students-by-email-status/?status=pending
 ```
 
-### 4. Sample Request Structure
-```
-Method: POST
-URL: {{base_url}}/api/students/
-Headers:
-- Content-Type: application/json
-- Authorization: Bearer {{auth_token}}
+#### Step 3: Email Notification Campaign
+```bash
+# Send emails to all students with rooms
+POST /api/students/resend-pending-emails/ (send_to_all=true)
 
-Body:
+# Monitor results
+GET /api/students/statistics/
+GET /api/students/students-by-email-status/?status=sent
+```
+
+### 2. Exam Day Management Workflow
+
+#### Step 1: Last-Minute Updates
+```bash
+# Check for students needing updates
+GET /api/students/students-by-email-status/?status=missing_gmail
+GET /api/students/students-by-email-status/?status=missing_room
+
+# Update student information
+PUT /api/students/{id}/ (for each student needing updates)
+```
+
+#### Step 2: Resend Notifications
+```bash
+# Resend to updated students
+POST /api/students/resend-pending-emails/ (specific student_ids)
+
+# Verify all students notified
+GET /api/students/statistics/
+```
+
+### 3. Branch-Specific Communication
+
+#### Step 1: Target Specific Branch
+```bash
+# Get students by branch
+GET /api/students/branches/CSE/years/2/students/
+
+# Check email status for branch
+GET /api/students/students-by-email-status/?status=pending&branch=CSE&year=2
+```
+
+#### Step 2: Send Branch-Specific Emails
+```bash
+# Send to specific branch/year
+POST /api/students/resend-pending-emails/
 {
-    "name": "Test Student",
-    "roll_number": "21CSE001",
-    "gmail_address": "test@gmail.com",
     "branch": "CSE",
     "year": "2"
 }
 ```
 
-### 5. Complete Test Scenarios
+### 4. Data Quality Management
 
-#### Scenario 1: Complete Authentication Flow
-1. Register new user
-2. Login with credentials
-3. Get user profile
-4. Request password reset
-5. Reset password with OTP
-6. Login with new password
+#### Step 1: Identify Data Issues
+```bash
+# Find students with missing data
+GET /api/students/students-by-email-status/?status=missing_gmail
+GET /api/students/students-by-email-status/?status=missing_room
 
-#### Scenario 2: Student Management Flow
-1. Create multiple students
-2. Filter by branch and year
-3. Update student details
-4. Get hierarchical data
-5. Delete student
+# Get comprehensive statistics
+GET /api/students/statistics/
+```
 
-#### Scenario 3: File Upload and Email Flow
-1. Upload CSV file without emails
-2. Verify room assignments
-3. Upload CSV with email sending
-4. Check statistics
-5. Send individual emails
-6. Send bulk emails
+#### Step 2: Bulk Data Correction
+```bash
+# Update students with missing information
+PUT /api/students/{id}/ (for each student)
 
-#### Scenario 4: Error Testing
-1. Test invalid authentication
-2. Test invalid data validation
-3. Test file upload errors
-4. Test email sending errors
+# Re-upload corrected room assignments
+POST /api/students/upload-rooms/
+```
 
-### 6. Performance Testing
-- Test with 100+ students
-- Upload files with 500+ records
-- Send bulk emails to 200+ students
-- Test concurrent operations
+### 5. Email Campaign Monitoring
+
+#### Step 1: Pre-Campaign Analysis
+```bash
+# Check readiness
+GET /api/students/statistics/
+GET /api/students/students-by-email-status/?status=pending
+```
+
+#### Step 2: Execute Campaign
+```bash
+# Send emails
+POST /api/students/resend-pending-emails/
+```
+
+#### Step 3: Post-Campaign Analysis
+```bash
+# Analyze results
+GET /api/students/statistics/
+GET /api/students/students-by-email-status/?status=sent
+```
 
 ---
 
 ## Best Practices
 
-### 1. Security
-- Always use HTTPS in production
-- Store JWT tokens securely
-- Implement rate limiting
-- Validate all input data
+### 1. Authentication Best Practices
 
-### 2. Error Handling
-- Implement proper error logging
-- Return meaningful error messages
-- Handle edge cases gracefully
+#### Token Management
+- Store access tokens securely (not in localStorage for production)
+- Implement automatic token refresh logic
+- Handle token expiration gracefully
+- Always include proper error handling for authentication failures
 
-### 3. Performance
+#### Password Security
+- Enforce strong password requirements
+- Use secure password reset flow with OTP
+- Implement rate limiting for authentication attempts
+- Log authentication events for security monitoring
+
+### 2. API Usage Best Practices
+
+#### Request Optimization
 - Use pagination for large datasets
-- Implement caching where appropriate
-- Optimize database queries
-- Use background tasks for email sending
+- Implement proper filtering to reduce payload size
+- Cache frequently accessed data (like hierarchy)
+- Use batch operations for bulk updates
 
-### 4. Testing
-- Test all endpoints with valid and invalid data
-- Test authentication flows thoroughly
-- Test file upload edge cases
+#### Error Handling
+- Always check response status codes
+- Implement retry logic for transient failures
+- Provide meaningful error messages to users
+- Log errors for debugging and monitoring
+
+### 3. Email Operations Best Practices
+
+#### Email Delivery
+- Validate email addresses before sending
+- Implement email delivery tracking
+- Handle SMTP failures gracefully
+- Use email templates for consistent formatting
+
+#### Bulk Operations
+- Process bulk emails in batches
+- Implement progress tracking for large operations
+- Provide detailed success/failure reporting
+- Allow resuming failed operations
+
+### 4. Data Management Best Practices
+
+#### File Uploads
+- Validate file format and size before processing
+- Provide clear error messages for file issues
+- Support both CSV and Excel formats
+- Implement data validation during import
+
+#### Data Integrity
+- Validate roll numbers for uniqueness
+- Check email format validity
+- Ensure branch/year combinations are valid
+- Implement data backup before bulk operations
+
+### 5. Performance Best Practices
+
+#### Database Operations
+- Use database indexes for frequently queried fields
+- Implement proper pagination for large datasets
+- Optimize queries for hierarchical data
+- Use caching for static data
+
+#### API Response Times
+- Implement response caching where appropriate
+- Use efficient serialization
+- Minimize database queries per request
+- Implement proper connection pooling
+
+### 6. Security Best Practices
+
+#### Data Protection
+- Encrypt sensitive data in transit and at rest
+- Implement proper input validation
+- Use parameterized queries to prevent SQL injection
+- Sanitize user inputs
+
+#### Access Control
+- Implement role-based access control
+- Use JWT tokens with appropriate expiration
+- Validate user permissions for each operation
+- Implement rate limiting to prevent abuse
+
+### 7. Testing Best Practices
+
+#### Automated Testing
+- Write unit tests for all API endpoints
+- Implement integration tests for workflows
+- Use test databases for development
+- Maintain test data fixtures
+
+#### Manual Testing
+- Test with realistic data volumes
+- Verify error scenarios
+- Test edge cases and boundary conditions
+- Validate email functionality in staging environment
+
+### 8. Monitoring and Logging
+
+#### Application Monitoring
+- Log all API requests and responses
 - Monitor email delivery rates
+- Track system performance metrics
+- Implement health checks for dependencies
 
-This comprehensive documentation provides a complete guide for implementing and testing the SmartNotice API system.
+#### Business Metrics
+- Track student enrollment trends
+- Monitor email campaign success rates
+- Analyze system usage patterns
+- Generate reports for administrators
+
+---
+
+## Conclusion
+
+The SmartNotice API provides a comprehensive solution for student management and email notification systems. This documentation covers all aspects of the API, from basic authentication to advanced email management features.
+
+Key features include:
+- Secure JWT-based authentication with OTP password reset
+- Complete student lifecycle management
+- Hierarchical data organization
+- Advanced email tracking and resending capabilities
+- Comprehensive statistics and analytics
+- Robust error handling and validation
+
+For additional support or feature requests, please contact the development team or refer to the API source code repository.
+
+---
+
+## Version History
+
+- **v1.0.0**: Initial release with basic student management
+- **v1.1.0**: Added email notification system
+- **v1.2.0**: Enhanced statistics and email tracking
+- **v1.3.0**: Added bulk email operations and resending capabilities
+- **v1.4.0**: Current version with comprehensive email management and enhanced analytics
+
+---
+
+## Contact Information
+
+- **Development Team**: [team@smartnotice.com](mailto:team@smartnotice.com)
+- **Support**: [Syed Mohammed Umar – umar.md.4474@gmail.com](mailto:umar.md.4474@gmail.com)
+- **GitHub Repository**: [github.com/syedmohammedumarumar/SmartNotice-project](https://github.com/syedmohammedumarumar/SmartNotice-project)
+- **Backend Developer**: [Syed Mohammed Umar](mailto:umar.md.4474@gmail.com)
+
